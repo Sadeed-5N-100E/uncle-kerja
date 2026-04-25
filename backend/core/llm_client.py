@@ -1,8 +1,6 @@
 """
-Thin wrapper around the ILMU Anthropic-compatible endpoint.
-
-Includes automatic retry with exponential backoff for transient 5xx errors
-(504 Gateway Timeout is common when the ILMU API is under load at hackathons).
+LLM client — ILMU GLM-5.1 via Anthropic-compatible endpoint.
+One retry on 504/503/502 with a 10-second wait. Fails fast after that.
 """
 from __future__ import annotations
 import time, logging
@@ -11,13 +9,7 @@ import anthropic
 from .config import ILMU_API_KEY, ILMU_BASE_URL, MODEL, MAX_TOKENS, TEMPERATURE
 
 log = logging.getLogger(__name__)
-
 _client: anthropic.Anthropic | None = None
-
-# Retry config: 3 attempts, delays 5s → 15s → 30s
-_RETRY_DELAYS = [5, 15, 30]
-# 5xx HTTP codes that are safe to retry
-_RETRYABLE_STATUS = {500, 502, 503, 504, 529}
 
 
 def get_client() -> anthropic.Anthropic:
@@ -45,41 +37,24 @@ def chat(
     if tools:       kwargs["tools"]       = tools
     if tool_choice: kwargs["tool_choice"] = tool_choice
 
-    last_exc: Exception | None = None
-
-    for attempt, delay in enumerate([0] + _RETRY_DELAYS, start=1):
-        if delay:
-            log.warning(f"ILMU API retry {attempt}/{len(_RETRY_DELAYS)+1} after {delay}s (previous: {last_exc})")
-            time.sleep(delay)
+    for attempt in range(2):   # 1 try + 1 retry
         try:
             return get_client().messages.create(**kwargs)
         except anthropic.InternalServerError as e:
-            # 504 / 503 / 500 — server-side, retryable
             status = getattr(e, "status_code", 0) or 0
-            if status in _RETRYABLE_STATUS or "504" in str(e) or "502" in str(e) or "503" in str(e):
-                last_exc = e
-                log.warning(f"ILMU API {status} on attempt {attempt}: {str(e)[:120]}")
+            if attempt == 0 and status in (500, 502, 503, 504):
+                log.warning(f"ILMU {status} — waiting 10s then one retry")
+                time.sleep(10)
                 continue
-            raise  # non-retryable server error
+            raise
         except anthropic.APIConnectionError as e:
-            # Network-level timeout — retryable
-            last_exc = e
-            log.warning(f"ILMU connection error on attempt {attempt}: {e}")
-            continue
-        except anthropic.RateLimitError as e:
-            # 429 — back off longer
-            last_exc = e
-            backoff = min(delay * 2, 60)
-            log.warning(f"ILMU rate limit on attempt {attempt}, sleeping {backoff}s")
-            time.sleep(backoff)
-            continue
+            if attempt == 0:
+                log.warning(f"ILMU connection error — waiting 10s then one retry: {e}")
+                time.sleep(10)
+                continue
+            raise
 
-    # All retries exhausted
-    raise RuntimeError(
-        f"ILMU API failed after {len(_RETRY_DELAYS)+1} attempts. "
-        f"Last error: {last_exc}. "
-        "This is a temporary server overload — please try again in a minute."
-    ) from last_exc
+    raise RuntimeError("ILMU API unreachable after 2 attempts — server may be overloaded.")
 
 
 def extract_text(message: anthropic.types.Message) -> str:

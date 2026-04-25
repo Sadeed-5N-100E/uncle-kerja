@@ -11,7 +11,7 @@ Running all three in parallel at step 3 avoids serial API timeouts that plagued
 the old scorer||jobs approach. Each parallel call gets its own TCP connection.
 """
 from __future__ import annotations
-import sys, time, uuid, concurrent.futures, logging
+import sys, time, uuid, logging
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parents[1]))
 
 from agents import (
@@ -100,40 +100,33 @@ def run_pipeline(
     score = session["score"]
     job_title = job_description.split("\n")[0][:80] if job_description else "this role"
 
-    # ── Step 3: Roaster + Coach + Job Finder in parallel ─────────────────────
-    _emit("Roasting, coaching and finding jobs…", 60)
+    # ── Step 3: Sequential — job finder (no LLM) → roaster → coach ───────────
+    # Running all three in parallel overloads ILMU; sequential is reliable.
+    # Job finder uses external APIs only (SerpAPI/TheirStack), so it's instant.
     t0 = time.time()
 
-    def _roast():
-        return roaster_agent.run(profile, score, job_title)
+    _emit("Finding matching jobs…", 60)
+    try:
+        session["jobs"] = job_finder_agent.run(profile, score)
+    except Exception as e:
+        log.exception("Job finder failed")
+        session["errors"].append(f"Jobs: {e}")
 
-    def _coach():
-        result = coach_agent.run(score, profile)
-        if not result:
-            # retry once — model sometimes returns content instead of tool call
-            result = coach_agent.run(score, profile)
-        return result
+    _emit("Roasting your resume…", 70)
+    try:
+        session["roast"] = roaster_agent.run(profile, score, job_title)
+    except Exception as e:
+        log.exception("Roaster failed")
+        session["errors"].append(f"Roaster: {e}")
 
-    def _jobs():
-        return job_finder_agent.run(profile, score)
+    _emit("Building action plan…", 83)
+    try:
+        session["action_plan"] = coach_agent.run(score, profile)
+    except Exception as e:
+        log.exception("Coach failed")
+        session["errors"].append(f"Coach: {e}")
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-        fut_roast = pool.submit(_roast)
-        fut_coach = pool.submit(_coach)
-        fut_jobs  = pool.submit(_jobs)
-
-        for name, fut, key in [
-            ("Roaster", fut_roast, "roast"),
-            ("Coach",   fut_coach, "action_plan"),
-            ("Jobs",    fut_jobs,  "jobs"),
-        ]:
-            try:
-                session[key] = fut.result(timeout=120)
-            except Exception as e:
-                log.exception(f"{name} failed")
-                session["errors"].append(f"{name}: {e}")
-
-    session["timings"]["roast+coach+jobs"] = round(time.time() - t0, 1)
+    session["timings"]["jobs+roast+coach"] = round(time.time() - t0, 1)
     _emit("Analysis complete", 92)
 
     # ── Step 4: Send job alert email if subscribed ────────────────────────────

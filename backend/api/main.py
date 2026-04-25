@@ -171,10 +171,26 @@ def inbox_messages(limit: int = 20):
 
 
 @app.get("/inbox/job-emails")
-def job_emails(limit: int = 20):
-    """Return sent job alert emails — for the logged-in user's 'Recent Alerts' view."""
+def job_emails(email: str = "", limit: int = 10):
+    """
+    Return job alert emails sent to a specific address.
+    Pass ?email=user@gmail.com to filter by recipient.
+    Falls back to all recent sent msgs if email not provided.
+    """
+    if email:
+        entries = mailer.get_sent_emails_for(email, limit=limit)
+        # Shape matches the AgentMail message format the frontend expects
+        shaped = [{
+            "subject":    e["subject"],
+            "created_at": e["sent_at"],
+            "labels":     ["sent"],
+            "from":       f"Uncle Kerja <{mailer.inbox_address()}>",
+        } for e in entries]
+        return {"emails": shaped, "count": len(shaped)}
+
+    # No email — return all recent sent job alerts (admin view)
     msgs = mailer.list_unread_messages(limit=limit)
-    JOB_KEYWORDS = ("jobs match", "job alert", "career copilot", "🎯")
+    JOB_KEYWORDS = ("jobs match", "job alert", "uncle kerja", "career copilot", "🎯")
     job_msgs = [
         m for m in msgs
         if any(kw.lower() in (m.get("subject") or "").lower() for kw in JOB_KEYWORDS)
