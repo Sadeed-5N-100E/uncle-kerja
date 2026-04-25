@@ -1,0 +1,37 @@
+# ── AI / LLM ─────────────────────────────────────────────────────────────────
+anthropic>=0.40.0          # ILMU Anthropic-compatible endpoint (primary)
+openai>=1.0.0              # ILMU OpenAI-compatible endpoint (fallback / streaming)
+
+# ── Web framework ─────────────────────────────────────────────────────────────
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+python-multipart>=0.0.18   # PDF file upload
+
+# ── PDF processing ────────────────────────────────────────────────────────────
+pdfplumber>=0.11.0
+
+# ── HTTP client ───────────────────────────────────────────────────────────────
+httpx>=0.28.0
+beautifulsoup4>=4.13.0
+lxml>=5.3.0                # faster HTML parser for bs4
+
+# ── Data / validation ─────────────────────────────────────────────────────────
+pydantic>=2.10.0
+python-dotenv>=1.0.0
+
+# ── Email ─────────────────────────────────────────────────────────────────────
+yagmail>=0.15.0            # Gmail SMTP wrapper (needs App Password, not main password)
+
+# ── Job alert scheduling ─────────────────────────────────────────────────────
+apscheduler>=3.11.0
+
+# ── Utils ─────────────────────────────────────────────────────────────────────
+python-dateutil>=2.9.0
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NOT used (intentional):
+#   langchain / langgraph  — adds ~200ms cold start, hidden magic, hard to debug
+#   FAISS / chromadb       — vector DB not needed; LLM does skill matching natively
+#   celery                 — too heavy; APScheduler is enough for job alert cron
+#   redis                  — in-memory dict session store is fine for hackathon
+# ─────────────────────────────────────────────────────────────────────────────
