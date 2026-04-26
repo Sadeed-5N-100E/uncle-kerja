@@ -108,16 +108,16 @@ def run(resume_profile: dict, job_description: str) -> dict:
 
 
 def _format_profile(p: dict) -> str:
+    edu = p.get("education", [])
+    exp = p.get("experience", [])
     lines = [
         f"Name: {p.get('full_name', 'Unknown')}",
         f"Years Experience: {p.get('years_experience', 0)}",
         f"Current Role: {p.get('current_role', 'Unknown')}",
         f"Skills: {', '.join(p.get('skills', []))}",
-        f"Education: {'; '.join(e.get('degree', '') + ' @ ' + e.get('institution', '') for e in p.get('education', []))}",
+        f"Education: {'; '.join(edu) if edu and isinstance(edu[0], str) else '; '.join(e.get('degree','') + ' @ ' + e.get('institution','') for e in edu)}",
+        f"Experience:",
     ]
-    for exp in p.get("experience", []):
-        lines.append(
-            f"- {exp.get('title')} at {exp.get('company')} ({exp.get('duration_yrs')} yrs): "
-            + "; ".join(exp.get("highlights", [])[:3])
-        )
+    for e in exp:
+        lines.append(f"  - {e}" if isinstance(e, str) else f"  - {e.get('title')} at {e.get('company')}")
     return "\n".join(lines)

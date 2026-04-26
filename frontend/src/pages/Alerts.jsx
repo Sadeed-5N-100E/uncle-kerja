@@ -12,8 +12,12 @@ export default function Alerts() {
   const [loadingInbox, setLoadingInbox] = useState(true)
 
   useEffect(() => {
-    api.inbox(10).then(d => setInbox(d.messages || [])).catch(()=>{}).finally(() => setLoadingInbox(false))
-  }, [])
+    if (!user?.email) { setLoadingInbox(false); return }
+    api.jobEmails(user.email, 10)
+      .then(d => setInbox(d.emails || []))
+      .catch(() => {})
+      .finally(() => setLoadingInbox(false))
+  }, [user?.email])
 
   const subscribeNow = async () => {
     setStatus('Subscribing…')
@@ -36,8 +40,10 @@ export default function Alerts() {
       const r = await api.pollInbox()
       const count = r.count || 0
       setStatus(count > 0 ? `Processed ${count} reply(ies).` : 'No new replies.')
-      const d = await api.inbox(10)
-      setInbox(d.messages || [])
+      if (user?.email) {
+        const d = await api.jobEmails(user.email, 10)
+        setInbox(d.emails || [])
+      }
     } catch(e) {
       setStatus('Poll error: ' + e.message)
     } finally {
@@ -87,7 +93,7 @@ export default function Alerts() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Mail size={18} className="text-slate-600" />
-            <h2 className="font-semibold text-slate-900">Inbox</h2>
+            <h2 className="font-semibold text-slate-900">Job Alerts Sent to You</h2>
             <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{inbox.length}</span>
           </div>
           <button onClick={pollNow} disabled={polling}
@@ -102,7 +108,7 @@ export default function Alerts() {
             <Loader2 size={16} className="animate-spin" /> Loading…
           </div>
         ) : inbox.length === 0 ? (
-          <p className="text-slate-400 text-sm py-4 text-center">No messages yet. Subscribe above to receive job alerts.</p>
+          <p className="text-slate-400 text-sm py-4 text-center">No job alerts sent yet. Subscribe above — alerts arrive from <strong>usm.z.ai@agentmail.to</strong>.</p>
         ) : (
           <div className="space-y-2">
             {inbox.map((m, i) => (

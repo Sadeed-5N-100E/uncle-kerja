@@ -1,64 +1,34 @@
 """
-Roaster Agent — generates a brutally honest, funny critique of the resume
-given the score report.
+Roaster Agent — generates a candid, witty critique of the resume.
 Input : resume_profile (dict), score_report (dict), job_title (str)
 Output: RoastReport dict
+
+Uses Gemini JSON-mode to avoid function-calling schema issues.
 """
 from __future__ import annotations
 import sys
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parents[1]))
 
-from core.llm_client import chat, extract_tool_input
+from core.llm_client import chat_json
 
-TOOL = {
-    "name": "roast_resume",
-    "description": "Generate a structured, brutally funny roast of a resume.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "opening_roast": {
-                "type": "string",
-                "description": "A savage one-liner opening that lands like a punchline",
-            },
-            "skills_roast": {
-                "type": "string",
-                "description": "Brutal commentary on their skill gaps for this specific role",
-            },
-            "experience_roast": {
-                "type": "string",
-                "description": "Honest take on their experience level vs what's needed",
-            },
-            "formatting_roast": {
-                "type": "string",
-                "description": "Commentary on resume presentation, keywords, structure",
-            },
-            "silver_lining": {
-                "type": "string",
-                "description": "One genuine strength, delivered with backhanded warmth",
-            },
-            "closing_line": {
-                "type": "string",
-                "description": "A memorable closing line — brutal but not cruel",
-            },
-            "emoji_rating": {
-                "type": "string",
-                "description": "Rate the resume with 1-5 fire emojis (e.g. 🔥🔥)",
-            },
-        },
-        "required": [
-            "opening_roast", "skills_roast", "experience_roast",
-            "formatting_roast", "silver_lining", "closing_line", "emoji_rating",
-        ],
-    },
+SYSTEM = """You are a frank and witty career advisor who delivers sharp, honest resume feedback.
+Your feedback is specific and based on real skill gaps — never generic.
+You focus on resume decisions, not the person. Tone: candid, dry, occasionally funny.
+You always find one genuine strength alongside the honest critique.
+
+Return a JSON object with exactly these fields:
+{
+  "opening_roast": "string — sharp one-liner summarising the resume's main issue",
+  "skills_roast": "string — direct commentary on skill gaps for this specific role",
+  "experience_roast": "string — honest assessment of experience vs what is needed",
+  "formatting_roast": "string — commentary on resume presentation, keywords, structure",
+  "silver_lining": "string — one genuine strength or positive aspect",
+  "closing_line": "string — candid but encouraging closing remark",
+  "emoji_rating": "string — 1 to 5 fire emojis e.g. 🔥🔥🔥"
 }
 
-SYSTEM = (
-    "You are a career roast comedian — part Simon Cowell, part Gordon Ramsay, part LinkedIn influencer gone rogue. "
-    "Your roasts are specific, witty, and based on real gaps. You NEVER punch down cruelly — "
-    "you roast the resume choices, not the person. Your tone: sharp, funny, honest. "
-    "Reference specific skills, companies, or gaps from the actual resume. No generic filler. "
-    "Use the roast_resume tool to deliver your structured roast."
-)
+Return ONLY the JSON object, no explanation.
+"""
 
 
 def run(resume_profile: dict, score_report: dict, job_title: str) -> dict:
@@ -73,16 +43,10 @@ def run(resume_profile: dict, score_report: dict, job_title: str) -> dict:
         f"{resume_profile.get('years_experience')} years exp, "
         f"current role: {resume_profile.get('current_role')}"
     )
-    response = chat(
+    result = chat_json(
         system=SYSTEM,
-        messages=[
-            {
-                "role": "user",
-                "content": f"Roast this resume:\n\n{context}",
-            }
-        ],
-        tools=[TOOL],
-        tool_choice={"type": "tool", "name": "roast_resume"},
-        temperature=0.8,
+        messages=[{"role": "user", "content": f"Give feedback on this resume:\n\n{context}"}],
     )
-    return extract_tool_input(response, "roast_resume")
+    result.setdefault("opening_roast", "")
+    result.setdefault("emoji_rating", "🔥")
+    return result

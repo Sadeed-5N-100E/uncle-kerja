@@ -2,14 +2,17 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).parents[2] / ".env")
+load_dotenv(Path(__file__).parents[2] / ".env", override=True)
 
-# ── Active LLM: ILMU GLM-5.1 ─────────────────────────────────────────────────
-ILMU_API_KEY    = os.getenv("ILMU_API_KEY", "sk-1191e2085cba6ce60e49fccafbb97240e3b36dfcc0014908")
-ILMU_BASE_URL   = os.getenv("ILMU_BASE_URL", "https://api.ilmu.ai/anthropic")
-MODEL           = os.getenv("ILMU_MODEL", "ilmu-glm-5.1")
+# ── Active LLM: Google Gemini 2.5 Flash ──────────────────────────────────────
+GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY", "")
+MODEL           = "gemini-2.5-flash"
 MAX_TOKENS      = 2048
 TEMPERATURE     = 0.3
+
+# ── ILMU GLM-5.1 (restore when server is back) ───────────────────────────────
+ILMU_API_KEY  = os.getenv("ILMU_API_KEY", "")
+ILMU_BASE_URL = os.getenv("ILMU_BASE_URL", "https://api.ilmu.ai/anthropic")
 
 # ── AgentMail ─────────────────────────────────────────────────────────────────
 AGENTMAIL_API_KEY  = os.getenv("AGENTMAIL_API_KEY", "")

@@ -2,69 +2,52 @@
 Parser Agent — extracts structured profile from raw resume text.
 Input : raw_text (str)
 Output: ResumeProfile dict
+
+Uses Gemini JSON-mode (not function calling) to avoid MALFORMED_FUNCTION_CALL
+on complex nested schemas.
 """
 from __future__ import annotations
 import sys
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parents[1]))
 
-from core.llm_client import chat, extract_tool_input
+from core.llm_client import chat_json
 
-TOOL = {
-    "name": "extract_resume",
-    "description": "Extract structured information from a resume.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "full_name":       {"type": "string"},
-            "email":           {"type": "string"},
-            "phone":           {"type": "string"},
-            "location":        {"type": "string", "description": "City / country"},
-            "summary":         {"type": "string", "description": "2-3 sentence professional summary"},
-            "years_experience":{"type": "number", "description": "Total years of work experience"},
-            "current_role":    {"type": "string"},
-            "skills":          {"type": "array", "items": {"type": "string"}, "description": "All technical + soft skills"},
-            "education": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "degree":      {"type": "string"},
-                        "institution": {"type": "string"},
-                        "year":        {"type": "integer"},
-                    },
-                },
-            },
-            "experience": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "title":        {"type": "string"},
-                        "company":      {"type": "string"},
-                        "duration_yrs": {"type": "number"},
-                        "highlights":   {"type": "array", "items": {"type": "string"}},
-                    },
-                },
-            },
-            "certifications": {"type": "array", "items": {"type": "string"}},
-            "languages":      {"type": "array", "items": {"type": "string"}},
-        },
-        "required": ["full_name", "years_experience", "skills", "experience"],
-    },
+SYSTEM = """You are a precise resume parser. Extract structured information from the resume text provided.
+
+Return a JSON object with exactly these fields:
+{
+  "full_name": "string",
+  "email": "string",
+  "phone": "string",
+  "location": "string (city/country)",
+  "summary": "string (2-3 sentence professional summary)",
+  "years_experience": integer,
+  "current_role": "string (most recent job title)",
+  "skills": ["skill1", "skill2", ...],
+  "education": ["Degree @ Institution, Year", ...],
+  "experience": ["Job Title at Company (N yrs): key achievements", ...],
+  "certifications": ["cert1", "cert2", ...]
 }
 
-SYSTEM = (
-    "You are a precise resume parser. Extract every piece of structured information "
-    "from the provided resume text. Be thorough — capture all skills, roles, and education. "
-    "Use the extract_resume tool to return your findings."
-)
+Rules:
+- years_experience must be an integer (round to nearest whole number)
+- skills must include ALL technical tools, languages, frameworks, and soft skills mentioned
+- experience entries must each be a single descriptive string
+- If a field has no data, use an empty string or empty array
+- Return ONLY the JSON object, no explanation
+"""
 
 
 def run(raw_text: str) -> dict:
-    response = chat(
+    result = chat_json(
         system=SYSTEM,
         messages=[{"role": "user", "content": f"Parse this resume:\n\n{raw_text}"}],
-        tools=[TOOL],
-        tool_choice={"type": "tool", "name": "extract_resume"},
     )
-    return extract_tool_input(response, "extract_resume")
+    # Ensure required fields exist with defaults
+    result.setdefault("full_name", "Unknown")
+    result.setdefault("years_experience", 0)
+    result.setdefault("skills", [])
+    result.setdefault("experience", [])
+    result.setdefault("education", [])
+    result.setdefault("certifications", [])
+    return result

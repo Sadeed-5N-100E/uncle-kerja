@@ -1,75 +1,48 @@
 """
-Coach Agent — turns a score report into a concrete, ranked improvement plan.
+Coach Agent — turns a score report into a concrete improvement plan.
 Input : ScoreReport dict, ResumeProfile dict
 Output: ActionPlan dict
+
+Uses Gemini JSON-mode to avoid function-calling schema issues with nested arrays.
 """
 from __future__ import annotations
 import sys
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parents[1]))
 
-from core.llm_client import chat, extract_tool_input
+from core.llm_client import chat_json
 
-TOOL = {
-    "name": "build_action_plan",
-    "description": "Build a concrete, prioritised action plan to improve a candidate's job fit.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "priority_actions": {
-                "type": "array",
-                "description": "Top 5 actions ranked by impact/effort ratio",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "rank":        {"type": "integer"},
-                        "category":    {"type": "string", "enum": ["skill", "experience", "keyword", "format", "network"]},
-                        "action":      {"type": "string", "description": "Specific, actionable step"},
-                        "effort":      {"type": "string", "enum": ["1-2 days", "1-2 weeks", "1-3 months", "3-6 months"]},
-                        "impact":      {"type": "string", "enum": ["low", "medium", "high", "critical"]},
-                        "resources":   {"type": "array", "items": {"type": "string"}, "description": "Free courses, tools, or links"},
-                    },
-                    "required": ["rank", "category", "action", "effort", "impact"],
-                },
-            },
-            "resume_rewrites": {
-                "type": "array",
-                "description": "Specific resume sections to rewrite with before/after examples",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "section":  {"type": "string"},
-                        "issue":    {"type": "string"},
-                        "improved": {"type": "string", "description": "Rewritten version using strong action verbs and quantification"},
-                    },
-                    "required": ["section", "issue", "improved"],
-                },
-            },
-            "quick_wins": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "3 things the candidate can fix in their resume TODAY (< 30 mins)",
-            },
-            "timeline_weeks": {
-                "type": "integer",
-                "description": "Realistic weeks to become competitive for this role if all actions completed",
-            },
-            "motivational_close": {
-                "type": "string",
-                "description": "One honest, encouraging sentence about the path forward",
-            },
-        },
-        "required": ["priority_actions", "resume_rewrites", "quick_wins", "timeline_weeks", "motivational_close"],
-    },
+SYSTEM = """You are a senior career coach. Give direct, practical advice with no filler.
+Every action item must be specific — name the exact skill, course, or tool.
+Prioritise by impact-to-effort ratio: high impact + low effort = rank 1.
+Resources must be free or widely available (Coursera free audit, freeCodeCamp, official docs).
+
+Return a JSON object with exactly these fields:
+{
+  "priority_actions": [
+    {
+      "rank": 1,
+      "category": "skill|experience|keyword|format|network",
+      "action": "specific actionable step",
+      "effort": "days|weeks|months",
+      "impact": "low|medium|high|critical",
+      "resources": ["free course or tool name"]
+    }
+  ],
+  "resume_rewrites": [
+    {
+      "section": "section name",
+      "issue": "what is wrong",
+      "improved": "rewritten version with action verbs and quantification"
+    }
+  ],
+  "quick_wins": ["thing to fix today in under 30 minutes"],
+  "timeline_weeks": 8,
+  "motivational_close": "one honest encouraging sentence"
 }
 
-SYSTEM = (
-    "You are a senior career coach and ex-FAANG recruiter. "
-    "You give brutally practical advice — no fluff, no participation trophies. "
-    "Every action item must be specific (name the exact skill, course, or tool). "
-    "Prioritise by impact-to-effort ratio: high impact + low effort = rank 1. "
-    "Resources must be free or widely available (Coursera free audit, freeCodeCamp, official docs). "
-    "Use the build_action_plan tool to return your structured plan."
-)
+Include 3-5 priority_actions, 1-3 resume_rewrites, 3 quick_wins.
+Return ONLY the JSON object, no explanation.
+"""
 
 
 def run(score_report: dict, resume_profile: dict) -> dict:
@@ -84,10 +57,13 @@ def run(score_report: dict, resume_profile: dict) -> dict:
         f"Experience gap: {score_report.get('experience_gap', 'None')}\n"
         f"Summary: {score_report.get('one_line_summary')}"
     )
-    response = chat(
+    result = chat_json(
         system=SYSTEM,
-        messages=[{"role": "user", "content": f"Build an action plan:\n\n{context}"}],
-        tools=[TOOL],
-        tool_choice={"type": "tool", "name": "build_action_plan"},
+        messages=[{"role": "user", "content": f"Build an improvement plan:\n\n{context}"}],
     )
-    return extract_tool_input(response, "build_action_plan")
+    result.setdefault("priority_actions", [])
+    result.setdefault("resume_rewrites", [])
+    result.setdefault("quick_wins", [])
+    result.setdefault("timeline_weeks", 8)
+    result.setdefault("motivational_close", "")
+    return result

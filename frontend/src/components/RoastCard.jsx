@@ -49,8 +49,8 @@ export default function RoastCard({ roast }) {
 
       {/* Closing */}
       {roast.closing_line && (
-        <div className="bg-slate-900 rounded-xl p-5">
-          <p className="text-white font-medium text-sm leading-relaxed">"{roast.closing_line}"</p>
+        <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+          <p className="text-slate-100 font-medium text-sm leading-relaxed">"{roast.closing_line}"</p>
         </div>
       )}
     </div>

@@ -69,30 +69,32 @@ export default function Dashboard() {
     <div className="max-w-3xl mx-auto px-4 py-10 page-enter">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Analyse your resume</h1>
-        <p className="text-slate-500 mt-1">Upload your resume and a job description. We'll score, roast, coach, and find matching jobs.</p>
+        <img src="/assets/Uncle-kerja-logo.png" alt="Uncle Kerja"
+             className="h-11 object-contain mb-5" />
+        <h1 className="text-3xl font-bold text-slate-900">Analyse Your Resume</h1>
+        <p className="text-slate-500 mt-1">Upload your resume and a job description. We'll score, roast, coach, and find matching Malaysian jobs.</p>
       </div>
 
       {loading ? (
         /* Progress state */
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
-          <Loader2 size={40} className="animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="font-semibold text-slate-800 text-lg mb-1">{progress.step || 'Starting agents…'}</p>
-          <p className="text-slate-400 text-sm mb-6">This takes about 90 seconds. Agents run in parallel.</p>
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+          <Loader2 size={40} className="animate-spin text-purple-500 mx-auto mb-4" />
+          <p className="font-semibold text-slate-900 text-lg mb-1">{progress.step || 'Starting agents…'}</p>
+          <p className="text-slate-500 text-sm mb-6">Takes about 90 seconds. Uncle Kerja is working hard!</p>
           <div className="max-w-xs mx-auto">
-            <div className="flex justify-between text-xs text-slate-400 mb-1">
+            <div className="flex justify-between text-xs text-slate-500 mb-1">
               <span>Progress</span><span>{progress.pct}%</span>
             </div>
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 rounded-full bar-animate" style={{ width: `${progress.pct}%` }} />
+              <div className="h-full bg-purple-500 rounded-full bar-animate" style={{ width: `${progress.pct}%` }} />
             </div>
           </div>
           <div className="mt-6 space-y-2">
             {STEPS.map((s, i) => (
               <div key={s.key} className={`flex items-center gap-2 text-sm transition-colors
-                ${progress.pct >= s.pct ? 'text-green-600' : 'text-slate-300'}`}>
+                ${progress.pct >= s.pct ? 'text-green-600' : 'text-slate-400'}`}>
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold
-                  ${progress.pct >= s.pct ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-300'}`}>
+                  ${progress.pct >= s.pct ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
                   {progress.pct >= s.pct ? '✓' : i + 1}
                 </div>
                 {s.label}
@@ -106,11 +108,11 @@ export default function Dashboard() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Resume (PDF)</label>
             <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors
-              ${isDragActive ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+              ${isDragActive ? 'border-purple-500 bg-purple-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
               <input {...getInputProps()} />
               {file ? (
                 <div className="flex items-center justify-center gap-3">
-                  <FileText size={20} className="text-blue-500" />
+                  <FileText size={20} className="text-purple-600" />
                   <span className="text-sm font-medium text-slate-700">{file.name}</span>
                   <button type="button" onClick={e => { e.stopPropagation(); setFile(null) }}
                     className="text-slate-400 hover:text-red-500"><X size={16} /></button>
@@ -119,7 +121,7 @@ export default function Dashboard() {
                 <>
                   <Upload size={24} className="text-slate-300 mx-auto mb-2" />
                   <p className="text-sm text-slate-500">
-                    <span className="text-blue-600 font-medium">Click to upload</span> or drag & drop
+                    <span className="text-purple-600 font-medium">Click to upload</span> or drag & drop
                   </p>
                   <p className="text-xs text-slate-400 mt-1">PDF or TXT</p>
                 </>
@@ -133,7 +135,8 @@ export default function Dashboard() {
               <label className="block text-sm font-medium text-slate-700 mb-2">Or paste resume text</label>
               <textarea id="resume-paste" rows={5}
                 placeholder="Paste your full resume text here…"
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800
+                           placeholder-slate-400 focus:outline-none focus:border-purple-500 resize-none" />
             </div>
           )}
 
@@ -144,17 +147,22 @@ export default function Dashboard() {
             </label>
             <textarea value={jd} onChange={e => setJd(e.target.value)} rows={8}
               placeholder="Paste the full job description here…"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800
+                         placeholder-slate-400 focus:outline-none focus:border-purple-500 resize-none" />
           </div>
 
-          {/* Email for alerts */}
+          {/* Email */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
               Email for job alerts <span className="text-slate-400 font-normal">(optional)</span>
             </label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <div className="flex items-center gap-2">
+              <img src="/assets/gmail-logo.png" alt="Gmail" className="w-5 h-5 object-contain shrink-0" />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="your@gmail.com"
+                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800
+                           placeholder-slate-400 focus:outline-none focus:border-purple-500" />
+            </div>
           </div>
 
           {error && (
@@ -162,7 +170,8 @@ export default function Dashboard() {
           )}
 
           <button type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+            className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold py-3 rounded-xl
+                       transition-colors flex items-center justify-center gap-2">
             Analyse Resume <ChevronRight size={18} />
           </button>
         </form>

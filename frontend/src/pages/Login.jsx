@@ -1,11 +1,29 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Target, Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 
+// Two accounts only:
+//   Admin  = tomleeatwork@gmail.com  — sees all sessions, inbox, system stats
+//   User   = teamusm20@gmail.com     — sees only their own history and alerts
+// Local shortcuts (offline, instant):
+//   admin@demo.local / Admin@1234
+//   user@demo.local  / User@1234
 const DEMO_ACCOUNTS = [
-  { label: 'Admin',       email: 'admin@demo.local', password: 'Admin@1234', badge: 'bg-purple-100 text-purple-700' },
-  { label: 'Demo User',   email: 'user@demo.local',  password: 'User@1234',  badge: 'bg-blue-100 text-blue-700' },
+  {
+    label:    'Admin (Tom Lee)',
+    email:    'admin@demo.local',
+    password: 'Admin@1234',
+    hint:     'All sessions · Inbox · System',
+    badge:    'border-purple-300 text-purple-700',
+  },
+  {
+    label:    'User (Team USM)',
+    email:    'user@demo.local',
+    password: 'User@1234',
+    hint:     'Own history · Alerts only',
+    badge:    'border-blue-300 text-blue-700',
+  },
 ]
 
 export default function Login() {
@@ -17,26 +35,16 @@ export default function Login() {
   const [error,   setError]   = useState('')
   const [loading, setLoading] = useState(false)
 
-  const submit = async (e) => {
-    e.preventDefault()
+  const doLogin = async (e, pw_, email_) => {
+    e?.preventDefault()
+    const em = email_ ?? email
+    const p  = pw_    ?? pw
     setError(''); setLoading(true)
     try {
-      const user = await login(email, pw)
+      const user = await login(em, p)
       navigate(user.role === 'admin' ? '/admin' : '/')
     } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const quickLogin = async (acc) => {
-    setError(''); setLoading(true)
-    try {
-      const user = await login(acc.email, acc.password)
-      navigate(user.role === 'admin' ? '/admin' : '/')
-    } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Login failed. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -45,38 +53,38 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-500 rounded-xl mb-3">
-            <Target size={24} className="text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">Career Copilot MY</h1>
-          <p className="text-slate-500 text-sm mt-1">AI-powered career intelligence</p>
+          <img
+            src="/assets/Uncle-kerja-logo.png"
+            alt="Uncle Kerja"
+            className="h-16 object-contain mx-auto mb-3"
+          />
+          <p className="text-slate-500 text-sm">AI-Powered Career Intelligence for Malaysia</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          <h2 className="text-lg font-semibold text-slate-900 mb-6">Sign in to your account</h2>
+        <div className="rounded-2xl border border-slate-200 bg-white p-7">
+          <h2 className="text-lg font-semibold text-slate-900 mb-5">Sign in to your account</h2>
 
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={doLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-              <input
-                type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com" required
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <label className="block text-sm font-medium text-slate-600 mb-1">Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="you@email.com" required
+                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5
+                           text-sm text-slate-900 placeholder-slate-400
+                           focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">Password</label>
               <div className="relative">
-                <input
-                  type={showPw ? 'text' : 'password'} value={pw} onChange={e => setPw(e.target.value)}
+                <input type={showPw ? 'text' : 'password'} value={pw} onChange={e => setPw(e.target.value)}
                   placeholder="••••••••" required
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 pr-10
+                             text-sm text-slate-900 placeholder-slate-400
+                             focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30" />
                 <button type="button" onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700">
                   {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
@@ -89,25 +97,33 @@ export default function Login() {
             )}
 
             <button type="submit" disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium py-2.5 rounded-lg transition-colors text-sm">
-              {loading ? 'Signing in…' : 'Sign in'}
+              className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50
+                         text-white font-semibold py-2.5 rounded-lg transition-colors text-sm">
+              {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
 
-          {/* Demo quick-login */}
-          <div className="mt-6 pt-6 border-t border-slate-100">
-            <p className="text-xs text-slate-400 text-center mb-3">Demo accounts</p>
+          {/* Demo accounts */}
+          <div className="mt-6 pt-5 border-t border-slate-100">
+            <p className="text-xs text-slate-400 text-center mb-3">Demo accounts — click to log in instantly</p>
             <div className="grid grid-cols-2 gap-2">
               {DEMO_ACCOUNTS.map(acc => (
-                <button key={acc.email} onClick={() => quickLogin(acc)} disabled={loading}
-                  className="flex flex-col items-center gap-1 border border-slate-200 rounded-lg p-3 hover:bg-slate-50 transition-colors text-left">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${acc.badge}`}>
-                    {acc.label}
-                  </span>
-                  <span className="text-xs text-slate-500">{acc.email}</span>
+                <button key={acc.email} onClick={() => doLogin(null, acc.password, acc.email)}
+                  disabled={loading}
+                  className={`flex flex-col items-start gap-0.5 bg-slate-50 border rounded-xl p-3
+                              hover:bg-slate-100 transition-all text-left ${acc.badge}`}>
+                  <span className="text-xs font-semibold text-slate-800">{acc.label}</span>
+                  <span className="text-xs text-slate-400">{acc.hint}</span>
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Z AI */}
+          <div className="mt-5 flex items-center justify-center gap-2 opacity-50">
+            <img src="/assets/Z-AI-logo.png" alt="Z AI"
+                 className="w-4 h-4 object-contain brightness-0" />
+            <span className="text-xs text-slate-500">Powered by Z AI GLM-5.1</span>
           </div>
         </div>
       </div>

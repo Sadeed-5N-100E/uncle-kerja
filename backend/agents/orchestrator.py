@@ -38,15 +38,19 @@ def run_pipeline(
     resume_text: str,
     job_description: str,
     alert_email: str | None = None,
-    progress_cb=None,  # callable(step: str, pct: int)
+    user_email: str = "anonymous",
+    progress_cb=None,
 ) -> dict:
     """
     Run the full 6-agent pipeline. Returns a completed session dict.
     progress_cb(step, pct) is called after each major step for SSE streaming.
     """
+    from datetime import datetime, timezone
     session_id = str(uuid.uuid4())
     session: dict = {
-        "session_id": session_id,
+        "session_id":  session_id,
+        "user_email":  user_email,
+        "created_at":  datetime.now(timezone.utc).isoformat(),
         "status":      "running",
         "profile":     None,
         "score":       None,
@@ -99,6 +103,7 @@ def run_pipeline(
 
     score = session["score"]
     job_title = job_description.split("\n")[0][:80] if job_description else "this role"
+    session["job_title"] = job_title
 
     # ── Step 3: Sequential — job finder (no LLM) → roaster → coach ───────────
     # Running all three in parallel overloads ILMU; sequential is reliable.
@@ -144,6 +149,16 @@ def run_pipeline(
                 session["errors"].append(f"Email: {e}")
 
     session["status"] = "done"
+
+    # ── Step 5: Persist to database ───────────────────────────────────────────
+    try:
+        from core.db import save_analysis, upsert_alert
+        save_analysis(session)
+        if alert_email:
+            upsert_alert(alert_email, session_id)
+    except Exception as e:
+        log.error(f"DB save failed (non-critical): {e}")
+
     _emit("Done", 100)
     return session
 

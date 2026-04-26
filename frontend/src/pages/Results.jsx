@@ -19,10 +19,32 @@ export default function Results() {
   const [alertStatus, setAlertStatus] = useState(null)
 
   useEffect(() => {
-    api.session(sessionId)
-      .then(s  => setSession(s))
-      .catch(() => navigate('/'))
-      .finally(() => setLoading(false))
+    const load = async () => {
+      try {
+        // Live session (in-memory, full data)
+        const s = await api.session(sessionId)
+        setSession(s)
+      } catch {
+        try {
+          // Persisted session (DB — score + profile only; roast/plan/jobs not stored)
+          const hist = await api.historyFull(sessionId)
+          setSession({
+            session_id:  hist.id,
+            profile:     hist.profile_json || {},
+            score:       hist.score_json   || {},
+            roast:       {},
+            action_plan: {},
+            jobs:        { local_jobs: [], remote_jobs: [] },
+            errors:      hist.errors || [],
+          })
+        } catch {
+          navigate('/')
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
   }, [sessionId])
 
   const subscribeAlerts = async () => {
@@ -140,15 +162,15 @@ export default function Results() {
           {/* Alert subscribe */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
             <div className="flex items-center gap-2 mb-2">
-              <Bell size={16} className="text-blue-600" />
-              <span className="font-semibold text-blue-900 text-sm">Get daily job alerts</span>
+              <img src="/assets/gmail-logo.png" alt="Gmail" className="w-5 h-5 object-contain" />
+              <span className="font-semibold text-blue-900 text-sm">Dapatkan job alerts harian via Gmail</span>
             </div>
             <p className="text-blue-700 text-xs mb-3">
-              Fresh matching jobs emailed every morning. Reply to the email to refine your search.
+              Kerja terbaru dihantar ke Gmail awak setiap pagi. Reply email untuk ubah carian awak.
             </p>
             <div className="flex gap-2">
               <input type="email" value={alertEmail} onChange={e => setAlertEmail(e.target.value)}
-                placeholder="your@email.com"
+                placeholder="awak@gmail.com"
                 className="flex-1 border border-blue-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               <button onClick={subscribeAlerts}
                 className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg transition-colors whitespace-nowrap">

@@ -24,7 +24,7 @@ import httpx
 from jose import jwt, JWTError
 from fastapi import Header, HTTPException
 
-load_dotenv(Path(__file__).parents[2] / ".env")
+load_dotenv(Path(__file__).parents[2] / ".env", override=True)
 log = logging.getLogger(__name__)
 
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL", "")

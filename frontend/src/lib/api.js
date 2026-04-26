@@ -1,7 +1,13 @@
 const BASE = ''  // empty = same origin (Vite proxy handles /api, /analyze, etc.)
 
+// Always attach the stored auth token automatically
+function _authHeader() {
+  const t = localStorage.getItem('cc_token')
+  return t ? { 'Authorization': `Bearer ${t}` } : {}
+}
+
 async function req(method, path, body, token) {
-  const headers = { 'Content-Type': 'application/json' }
+  const headers = { 'Content-Type': 'application/json', ..._authHeader() }
   if (token) headers['Authorization'] = `Bearer ${token}`
   const opts = { method, headers }
   if (body && !(body instanceof FormData)) opts.body = JSON.stringify(body)
@@ -38,8 +44,16 @@ export const api = {
   inbox:    (limit = 20)       => req('GET', `/inbox/messages?limit=${limit}`),
   pollInbox: ()                => req('POST', '/inbox/poll', {}),
 
-  // Job emails (for landing page)
-  jobEmails: (limit = 10)     => req('GET', `/inbox/job-emails?limit=${limit}`),
+  // Job emails — filtered by the logged-in user's email
+  jobEmails: (email = '', limit = 10) =>
+    req('GET', `/inbox/job-emails?email=${encodeURIComponent(email)}&limit=${limit}`),
+
+  // History (DB-backed, persists across restarts)
+  history:     (limit = 10) => req('GET', `/history?limit=${limit}`),
+  historyFull: (id)          => req('GET', `/history/${id}/full`),
+
+  // DB stats (admin)
+  dbStats: () => req('GET', '/db/stats'),
 
   // Health
   health:   ()                 => req('GET', '/health'),

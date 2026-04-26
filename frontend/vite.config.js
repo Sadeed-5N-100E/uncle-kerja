@@ -14,6 +14,8 @@ export default defineConfig({
       '/alerts':       'http://localhost:8000',
       '/inbox':        'http://localhost:8000',
       '/health':       'http://localhost:8000',
+      '/history':      'http://localhost:8000',
+      '/db':           'http://localhost:8000',
     },
   },
 })

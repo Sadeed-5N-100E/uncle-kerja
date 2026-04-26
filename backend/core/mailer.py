@@ -12,12 +12,9 @@ from typing import Any
 import httpx
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).parents[2] / ".env")
+load_dotenv(Path(__file__).parents[2] / ".env", override=True)
 
 log = logging.getLogger(__name__)
-
-# In-memory log of sent job alert emails {to_email: [{subject, sent_at, thread_id}]}
-_sent_log: dict[str, list[dict]] = {}
 
 AGENTMAIL_API_KEY  = os.getenv("AGENTMAIL_API_KEY", "")
 AGENTMAIL_INBOX_ID = os.getenv("AGENTMAIL_INBOX_ID", "usm.z.ai@agentmail.to")
@@ -82,16 +79,15 @@ def send(
             payload,
         )
         log.info(f"AgentMail sent to {recipients}: thread={result.get('thread_id')}")
-        # Track in sent log so users see only their own emails
-        import datetime
-        entry = {
-            "subject":    subject,
-            "sent_at":    datetime.datetime.utcnow().isoformat() + "Z",
-            "thread_id":  result.get("thread_id", ""),
-            "message_id": result.get("message_id", ""),
-        }
+        # Persist in DB (survives server restarts)
+        from core.db import log_sent_email
         for r in recipients:
-            _sent_log.setdefault(r.lower(), []).append(entry)
+            log_sent_email(
+                to_email=r,
+                subject=subject,
+                thread_id=result.get("thread_id", ""),
+                message_id=result.get("message_id", ""),
+            )
         return result
     except Exception as e:
         log.error(f"AgentMail send failed: {e}. Falling back to Gmail SMTP.")
@@ -165,8 +161,9 @@ def list_pending_replies(limit: int = 10) -> list[dict]:
 
 
 def get_sent_emails_for(email: str, limit: int = 10) -> list[dict]:
-    """Return job alert emails sent to a specific address (from in-memory log)."""
-    return list(reversed(_sent_log.get(email.lower(), [])))[:limit]
+    """Return job alert emails sent to a specific address (from persistent DB)."""
+    from core.db import get_sent_emails_for as db_get
+    return db_get(email, limit=limit)
 
 
 # ── Status ────────────────────────────────────────────────────────────────────

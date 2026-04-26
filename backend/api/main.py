@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -37,9 +37,11 @@ def _poll_inbox():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from core.db import init_db
+    init_db()
     scheduler.add_job(_poll_inbox, "interval", minutes=5, id="inbox_poll")
     scheduler.start()
-    log.info(f"Career Copilot MY ready. AgentMail: {mailer.inbox_address()}")
+    log.info(f"Uncle Kerja ready. AgentMail: {mailer.inbox_address()}")
     yield
     scheduler.shutdown(wait=False)
 
@@ -84,6 +86,7 @@ def health():
 
 @app.post("/analyze")
 async def analyze(
+    request:         Request,
     job_description: str = Form(...),
     alert_email:     str = Form(""),
     resume_text:     str = Form(""),
@@ -101,9 +104,22 @@ async def analyze(
     if not text.strip():
         raise HTTPException(400, "Could not extract text from resume")
 
+    # Extract user identity from Bearer token if present
+    user_email = "anonymous"
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        from core.auth import get_user
+        u = get_user(auth_header.split(" ", 1)[1])
+        if u:
+            user_email = u.get("email", "anonymous")
+
     import asyncio
     session = await asyncio.get_event_loop().run_in_executor(
-        None, lambda: orchestrator.run_pipeline(text, job_description, alert_email.strip() or None)
+        None, lambda: orchestrator.run_pipeline(
+            text, job_description,
+            alert_email.strip() or None,
+            user_email=user_email,
+        )
     )
     return JSONResponse(session)
 
@@ -197,6 +213,62 @@ def job_emails(email: str = "", limit: int = 10):
         and "sent" in (m.get("labels") or [])
     ]
     return {"emails": job_msgs[:10], "count": len(job_msgs)}
+
+
+@app.get("/history")
+def get_history(request: Request, limit: int = 10):
+    """Return analyses for the logged-in user. Admin sees all."""
+    from core.db import get_analyses_for, get_all_analyses
+    auth = request.headers.get("authorization", "")
+    user_email = "anonymous"
+    is_admin   = False
+    if auth.startswith("Bearer "):
+        from core.auth import get_user
+        u = get_user(auth.split(" ", 1)[1])
+        if u:
+            user_email = u.get("email", "anonymous")
+            is_admin   = u.get("role") == "admin"
+
+    rows = get_all_analyses(limit=limit) if is_admin else get_analyses_for(user_email, limit=limit)
+    # Strip heavy fields for list view
+    slim = [{
+        "id":            r["id"],
+        "created_at":    r["created_at"],
+        "job_title":     r["job_title"],
+        "overall_score": r["overall_score"],
+        "verdict":       r["verdict"],
+        "summary":       r["summary"],
+        "roast_opening": r["roast_opening"],
+        "jobs_count":    r["jobs_count"],
+        "user_email":    r["user_email"] if is_admin else None,
+    } for r in rows]
+    return {"analyses": slim, "count": len(slim)}
+
+
+@app.get("/history/{session_id}/full")
+def get_history_full(session_id: str):
+    """Return persisted full session (score + profile JSON) for a past analysis."""
+    from core.db import get_analysis_by_id
+    import json as _json
+    row = get_analysis_by_id(session_id)
+    if not row:
+        raise HTTPException(404, "Analysis not found")
+    result = dict(row)
+    # Deserialise JSON columns
+    for col in ("score_json", "profile_json", "skills_matched", "errors"):
+        if result.get(col):
+            try:
+                result[col] = _json.loads(result[col])
+            except Exception:
+                pass
+    return result
+
+
+@app.get("/db/stats")
+def db_stats():
+    """Admin: database statistics."""
+    from core.db import db_stats as _stats
+    return _stats()
 
 
 # ── SPA / static file serving ─────────────────────────────────────────────────

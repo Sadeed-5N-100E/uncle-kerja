@@ -1,25 +1,25 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
-import { RefreshCw, Mail, Activity, Loader2 } from 'lucide-react'
+import { RefreshCw, Mail, Activity, Loader2, Database, ChevronRight } from 'lucide-react'
 
 export default function Admin() {
-  const [health,  setHealth]  = useState(null)
-  const [inbox,   setInbox]   = useState([])
-  const [loading, setLoading] = useState(true)
-  const [polling, setPolling] = useState(false)
+  const [health,    setHealth]    = useState(null)
+  const [inbox,     setInbox]     = useState([])
+  const [dbStats,   setDbStats]   = useState(null)
+  const [loading,   setLoading]   = useState(true)
+  const [polling,   setPolling]   = useState(false)
   const [pollResult, setPollResult] = useState(null)
 
   const loadData = async () => {
     setLoading(true)
-    try {
-      const [h, m] = await Promise.all([api.health(), api.inbox(20)])
-      setHealth(h)
-      setInbox(m.messages || [])
-    } catch(e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
-    }
+    const [h, m, db] = await Promise.allSettled([
+      api.health(), api.inbox(20), api.dbStats()
+    ])
+    setHealth(h.status === 'fulfilled' ? h.value : null)
+    setInbox(m.status === 'fulfilled' ? (m.value.messages || []) : [])
+    setDbStats(db.status === 'fulfilled' ? db.value : null)
+    setLoading(false)
   }
 
   useEffect(() => { loadData() }, [])
@@ -66,10 +66,14 @@ export default function Admin() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        {stat('Status', health?.status === 'ok' ? '🟢 OK' : '🔴 Down')}
-        {stat('AgentMail', health?.email_ready ? '✓ Ready' : '✗ Not configured', health?.agentmail_inbox || '')}
+        {stat('Status', health == null ? '— Loading' : health.status === 'ok' ? '🟢 OK' : '🔴 Down')}
+        {stat('AgentMail',
+          health == null ? '—' : health.email_ready ? '✓ Ready' : '✗ Not configured',
+          health?.agentmail_inbox || 'usm.z.ai@agentmail.to')}
+        {stat('Analyses', dbStats?.analyses ?? '—', 'in database')}
+        {stat('Active Alerts', dbStats?.alerts ?? '—', 'subscribers')}
+        {stat('Emails Sent', dbStats?.sent_emails ?? '—', 'job alerts sent')}
         {stat('Inbox', inbox.length, 'recent messages')}
-        {stat('Sent', inbox.filter(m => (m.labels||[]).includes('sent')).length, 'sent messages')}
       </div>
 
       {/* Reply agent */}
